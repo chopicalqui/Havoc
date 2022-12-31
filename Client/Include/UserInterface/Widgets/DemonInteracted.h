@@ -30,6 +30,8 @@ namespace HavocNamespace::UserInterface::Widgets
             QStringList CommandHistory;
             explicit DemonInput(QWidget *parent = nullptr);
 
+            void AddCommand( const QString& Command );
+
         protected:
             bool event(QEvent *) override;
         };
@@ -48,7 +50,7 @@ namespace HavocNamespace::UserInterface::Widgets
         void AutoCompleteClear();
 
     private slots:
-                void AppendFromInput();
+        void AppendFromInput();
 
     };
 }

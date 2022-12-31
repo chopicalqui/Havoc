@@ -31,15 +31,17 @@ enum class Commands {
     INJECT_DLL              = 22,
     INJECT_SHELLCODE        = 24,
     INJECT_DLL_SPAWN        = 26,
-    PROC_PPIDSPOOF          = 27,
     TOKEN                   = 40,
     PROC                    = 0x1010,
+    PS_IMPORT               = 0x1011,
     INLINE_EXECUTE_ASSEMBLY = 0x2001,
     ASSEMBLY_LIST_VERSIONS 	= 0x2003,
     NET                     = 2100,
     CONFIG                  = 2500,
     SCREENSHOT              = 2510,
     PIVOT                   = 2520,
+    TRANSFER                = 2530,
+    SOCKET                  = 2540,
 
     OUTPUT  = 90,
     ERROR   = 91,
@@ -51,7 +53,7 @@ class DispatchOutput
 public:
     HavocSpace::DemonCommands* DemonCommandInstance;
 
-    auto MessageOutput( QString JsonString, const QString& Date ) -> void;
+    auto MessageOutput( QString JsonString, const QString& Date ) const -> void;
 };
 
 class CommandExecute
@@ -64,18 +66,21 @@ public:
     auto Checkin( QString TaskID ) -> void;
     auto Job( QString TaskID, QString SubCommand, QString Argument ) -> void;
     auto FS( const QString& TaskID, QString SubCommand, QString Arguments ) -> void;
+    auto Transfer( const QString& TaskID, QString SubCommand, QString FileID ) -> void;
+    auto Socket( const QString& TaskID, QString SubCommand, QString Params ) -> void;
 
     auto ProcModule( QString TaskID, int SubCommand, QString Args ) -> void;
     auto ProcList( QString TaskID, bool FromProcessManager ) -> void;
-    auto ProcPpidSpoof( QString TaskID, QString PPIDSpoof ) -> void;
+    auto PsImport( QString TaskID, QString Content );
 
     auto ShellcodeInject( QString TaskID, QString InjectionTechnique, QString TargetPID, QString TargetArch, QString Path, QString Arguments ) const -> void;
     auto ShellcodeSpawn( QString TaskID, QString InjectionTechnique, QString TargetArch, QString Path, QString Arguments ) -> void;
+    auto ShellcodeExecute( QString TaskID, QString InjectionTechnique, QString TargetArch, QString Path, QString Arguments ) -> void;
 
     auto DllInject( QString TaskID, QString TargetPID, QString Path, QString Params ) -> void;
     auto DllSpawn( QString TaskID, QString FilePath, QByteArray Args ) -> void;
 
-    auto InlineExecute( QString TaskID, QString FunctionName, QString Path, QString Args, QString Flags ) -> void;
+    auto InlineExecute( QString TaskID, QString FunctionName, QString Path, QByteArray Args, QString Flags ) -> void;
     auto AssemblyInlineExecute( QString TaskID, QString Path, QString Args ) -> void;
     auto AssemblyListVersions( QString TaskID ) -> void;
     auto Net( QString TaskID, QString Command, QString Param ) -> void;
@@ -93,13 +98,16 @@ class HavocSpace::DemonCommands
 
 public:
     UserInterface::Widgets::DemonInteracted* DemonConsole = nullptr;
-    QString Teamserver;
-    QString DemonID;
-    u64     MagicValue;
-    QString AgentTypeName;
-    DispatchOutput OutputDispatch;
-    CommandExecute Execute;
-    QString Prompt;
+
+    QString         Teamserver;
+    QString         DemonID;
+    u64             MagicValue;
+    QString         AgentTypeName;
+    DispatchOutput  OutputDispatch;
+    CommandExecute  Execute;
+    QString         Prompt;
+    /* Something the command scripts can write to */
+    QStringList     BufferedMessages;
 
     typedef struct SubCommand
     {
@@ -122,14 +130,14 @@ public:
         QStringList MitreTechniques;
         QString     Usage;
         QString     Example;
-
-        bool        Config;
+        bool        Module;
 
         std::vector<SubCommand_t> SubCommands;
     } Command_t;
 
     static std::vector<Command_t>   DemonCommandList;
     QMap<QString, QString>          CommandInputList;
+    QMap<QString, QString>          CommandTaskInfo;
 
     explicit DemonCommands();
 

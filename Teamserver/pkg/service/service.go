@@ -70,6 +70,7 @@ func (s *Service) handleConnection(socket *websocket.Conn) {
 
 func (s *Service) authenticate(client *ClientService) bool {
     var (
+        Authed      = false
         Hasher      = sha3.New256()
         UserPass    string
         ServicePass string
@@ -111,9 +112,10 @@ func (s *Service) authenticate(client *ClientService) bool {
 
         if UserPass == ServicePass {
             logger.Debug("Service client authenticated")
-            AuthResponse["Body"]["Success"] = true
+            Authed = true
         }
 
+        AuthResponse["Body"]["Success"] = Authed
         Response, err = json.Marshal(AuthResponse)
         if err != nil {
             logger.Error("Failed marshaling response: " + err.Error())
@@ -128,10 +130,10 @@ func (s *Service) authenticate(client *ClientService) bool {
             return false
         }
 
-        return true
+        return Authed
     }
 
-    return false
+    return Authed
 }
 
 // the main service routine
@@ -161,6 +163,7 @@ func (s *Service) routine(client *ClientService) {
 }
 
 func (s *Service) dispatch(response map[string]map[string]any, client *ClientService) {
+    logger.Debug("Dispatch response:", response)
     switch response["Head"]["Type"] {
 
     case HeadRegisterAgent:
@@ -170,17 +173,22 @@ func (s *Service) dispatch(response map[string]map[string]any, client *ClientSer
             return
         }
 
-        var agent = NewAgentService(data, client)
-        agent.service = s
+        var a = NewAgentService(data, client)
+        if a == nil {
+            logger.Error("Failed to make a new service agent.")
+            return
+        }
 
-        s.Agents = append(s.Agents, agent)
+        a.service = s
+
+        s.Agents = append(s.Agents, a)
 
         pk := events.Service.AgentRegister(string(data))
 
         s.Events.EventAppend(pk)
         s.Events.EventBroadcast("", pk)
 
-        logger.Debug(agent.Json())
+        logger.Debug(a.Json())
 
     case HeadAgent:
         // TODO: find agent and send response to it
@@ -189,9 +197,13 @@ func (s *Service) dispatch(response map[string]map[string]any, client *ClientSer
 
         case BodyAgentTask:
             var (
-                Agent = response["Body"]["Agent"].(map[string]any)
+                Agent map[string]any
                 Task  string
             )
+
+            if val, ok := response["Body"]["Agent"]; ok && val != nil {
+                Agent = val.(map[string]any)
+            }
 
             if val, ok := response["Body"]["Task"]; ok {
                 Task = val.(string)
@@ -263,11 +275,12 @@ func (s *Service) dispatch(response map[string]map[string]any, client *ClientSer
             }
 
         case BodyAgentRegister:
+            logger.Debug("BodyAgentRegister")
             var (
                 Size          int
                 MagicValue    string
                 AgentID       string
-                Header        = agent.AgentHeader{}
+                Header        = agent.Header{}
                 RegisterInfo  = response["Body"]["RegisterInfo"].(map[string]any)
                 AgentInstance *agent.Agent
                 err           error

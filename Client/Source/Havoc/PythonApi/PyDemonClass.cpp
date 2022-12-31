@@ -10,36 +10,34 @@
 
 PyMemberDef PyDemonClass_members[] = {
 
-        { "Listener",       T_STRING, offsetof( PyDemonClass, Listener ), 0, "Listener name" },
-        { "DemonID",        T_STRING, offsetof( PyDemonClass, DemonID ), 0, "Listener name" },
-        { "ExternalIP",     T_STRING, offsetof( PyDemonClass, ExternalIP ), 0, "External IP" },
-        { "InternalIP",     T_STRING, offsetof( PyDemonClass, InternalIP ), 0, "Internal IP" },
-        { "User",           T_STRING, offsetof( PyDemonClass, User ), 0, "Username" },
-        { "Computer",       T_STRING, offsetof( PyDemonClass, Computer ), 0, "Computer" },
-        { "Domain",         T_STRING, offsetof( PyDemonClass, Domain ), 0, "Domain" },
-        { "OS",             T_STRING, offsetof( PyDemonClass, OS ), 0, "Windows Version" },
-        { "OSBuild",        T_STRING, offsetof( PyDemonClass, OSBuild ), 0, "Windows OS Build" },
-        { "OSArch",         T_STRING, offsetof( PyDemonClass, OSArch ), 0, "Windows Architecture" },
+        { "Listener",       T_STRING, offsetof( PyDemonClass, Listener ),    0, "Listener name" },
+        { "DemonID",        T_STRING, offsetof( PyDemonClass, DemonID ),     0, "Listener name" },
+        { "ExternalIP",     T_STRING, offsetof( PyDemonClass, ExternalIP ),  0, "External IP" },
+        { "InternalIP",     T_STRING, offsetof( PyDemonClass, InternalIP ),  0, "Internal IP" },
+        { "User",           T_STRING, offsetof( PyDemonClass, User ),        0, "Username" },
+        { "Computer",       T_STRING, offsetof( PyDemonClass, Computer ),    0, "Computer" },
+        { "Domain",         T_STRING, offsetof( PyDemonClass, Domain ),      0, "Domain" },
+        { "OS",             T_STRING, offsetof( PyDemonClass, OS ),          0, "Windows Version" },
+        { "OSBuild",        T_STRING, offsetof( PyDemonClass, OSBuild ),     0, "Windows OS Build" },
+        { "OSArch",         T_STRING, offsetof( PyDemonClass, OSArch ),      0, "Windows Architecture" },
         { "ProcessName",    T_STRING, offsetof( PyDemonClass, ProcessName ), 0, "Process Name" },
-        { "ProcessID",      T_STRING, offsetof( PyDemonClass, ProcessID ), 0, "Process ID" },
+        { "ProcessID",      T_STRING, offsetof( PyDemonClass, ProcessID ),   0, "Process ID" },
         { "ProcessArch",    T_STRING, offsetof( PyDemonClass, ProcessArch ), 0, "Process Architecture" },
 
-        { "CONSOLE_INFO",   T_INT, offsetof( PyDemonClass, CONSOLE_INFO ), 0, "Console message type info" },
-        { "CONSOLE_ERROR",  T_INT, offsetof( PyDemonClass, CONSOLE_ERROR ), 0, "Console message type error" },
-        { "CONSOLE_TASK",   T_INT, offsetof( PyDemonClass, CONSOLE_TASK ), 0, "Console message type task" },
+        { "CONSOLE_INFO",   T_INT, offsetof( PyDemonClass, CONSOLE_INFO ),   0, "Console message type info" },
+        { "CONSOLE_ERROR",  T_INT, offsetof( PyDemonClass, CONSOLE_ERROR ),  0, "Console message type error" },
+        { "CONSOLE_TASK",   T_INT, offsetof( PyDemonClass, CONSOLE_TASK ),   0, "Console message type task" },
 
         { NULL },
 };
 
 PyMethodDef PyDemonClass_methods[] = {
-        { "ConsoleWrite",           ( PyCFunction ) DemonClass_ConsoleWrite, METH_VARARGS, "Prints messages to the demon sessions console" },
 
-        { "Shell",                  ( PyCFunction ) DemonClass_Shell, METH_VARARGS, "Executes a shell command in the context of the demon sessions" },
-        { "InlineExecute",          ( PyCFunction ) DemonClass_InlineExecute, METH_VARARGS, "Executes a coff file in the context of the demon sessions" },
-
-        { "DllSpawn",               ( PyCFunction ) DemonClass_DllSpawn, METH_VARARGS, "Spawn and injects a reflective dll and get output from it" },
-        { "DllInject",              ( PyCFunction ) DemonClass_DllInject, METH_VARARGS, "Injects a reflective dll into a specified process" },
-
+        { "ConsoleWrite",           ( PyCFunction ) DemonClass_ConsoleWrite,        METH_VARARGS, "Prints messages to the demon sessions console" },
+        { "ProcessCreate",          ( PyCFunction ) DemonClass_ProcessCreate,       METH_VARARGS, "Creates a Process" },
+        { "InlineExecute",          ( PyCFunction ) DemonClass_InlineExecute,       METH_VARARGS, "Executes a coff file in the context of the demon sessions" },
+        { "DllSpawn",               ( PyCFunction ) DemonClass_DllSpawn,            METH_VARARGS, "Spawn and injects a reflective dll and get output from it" },
+        { "DllInject",              ( PyCFunction ) DemonClass_DllInject,           METH_VARARGS, "Injects a reflective dll into a specified process" },
         { "DotnetInlineExecute",    ( PyCFunction ) DemonClass_DotnetInlineExecute, METH_VARARGS, "Executes a dotnet assembly in the context of the demon sessions" },
 
         { NULL },
@@ -135,14 +133,21 @@ int DemonClass_init( PPyDemonClass self, PyObject *args, PyObject *kwds )
     char*     kwdlist[]        = { "DemonID", NULL };
 
     if ( ! PyArg_ParseTupleAndKeywords( args, kwds, "s", kwdlist, &DemonID ) )
-        return 0;
+        return -1;
 
     for ( int i = 0; i < NumberOfSessions; ++i )
     {
         if ( DemonSessions[ i ].Name.compare( DemonID ) == 0 )
         {
-            AllocMov( self->Listener, DemonSessions[ i ].Listener.toStdString().c_str(), DemonSessions[ i ].Listener.size() );
+            /* seems like we are trying to use an 3rd party agent. */
+            if ( DemonSessions[ i ].MagicValue != DemonMagicValue )
+            {
+                spdlog::error( "[PyError] specified id is not a demon agent" );
+                PyErr_SetString( PyExc_TypeError, "specified id is not a demon agent" );
+                return -1;
+            }
 
+            AllocMov( self->Listener, DemonSessions[ i ].Listener.toStdString().c_str(), DemonSessions[ i ].Listener.size() );
             AllocMov( self->DemonID, DemonSessions[ i ].Name.toStdString().c_str(), DemonSessions[ i ].Name.size() );
             AllocMov( self->ExternalIP, DemonSessions[ i ].External.toStdString().c_str(), DemonSessions[ i ].External.size() );
             AllocMov( self->InternalIP, DemonSessions[ i ].Internal.toStdString().c_str(), DemonSessions[ i ].Internal.size() );
@@ -188,23 +193,50 @@ PyObject* DemonClass_Shell( PPyDemonClass self, PyObject *args )
     Py_RETURN_NONE;
 }
 
-// Demon.InlineExecute( TaskID: str, EntryFunc: str, Path: str, Args: str, Flag: str )
+// Demon.InlineExecute( TaskID: str, EntryFunc: str, Path: str, Args: str, Threaded: bool )
 PyObject* DemonClass_InlineExecute( PPyDemonClass self, PyObject *args )
 {
-    char* TaskID    = nullptr;
-    char* EntryFunc = nullptr;
-    char* Path      = nullptr;
-    char* Arguments = nullptr;
-    char* Flags     = nullptr;
+    spdlog::debug( "[PyApi] Demon::InlineExecute" );
 
-    if ( ! PyArg_ParseTuple( args, "sssss", &TaskID, &EntryFunc, &Path , &Arguments, &Flags ) )
+    char*     TaskID     = nullptr;
+    char*     EntryFunc  = nullptr;
+    char*     Path       = nullptr;
+    PyObject* PyArgBytes = nullptr;
+    auto      Flags      = QString();
+    PyObject* Threaded   = nullptr;
+
+    if ( ! PyArg_ParseTuple( args, "sssSO", &TaskID, &EntryFunc, &Path, &PyArgBytes, &Threaded ) )
         return nullptr;
+
+    if ( PyObject_IsTrue( Threaded ) == true )
+    {
+        Flags = "threaded";
+        spdlog::debug( "execute object file in threaded" );
+    }
+    else
+    {
+        Flags = "non-threaded";
+        spdlog::debug( "execute object file in non-threaded" );
+    }
 
     for ( auto& Sessions : HavocX::Teamserver.Sessions )
     {
         if ( Sessions.Name.compare( self->DemonID ) == 0 )
         {
-            Sessions.InteractedWidget->DemonCommands->Execute.InlineExecute( ( char* ) TaskID, ( char* ) EntryFunc, ( char* ) Path, ( char* ) Arguments, ( char* ) Flags );
+            if ( FileRead( Path ) == nullptr )
+            {
+                Sessions.InteractedWidget->AppendRaw();
+                Sessions.InteractedWidget->TaskError( "Failed to open object file path: " + QString( Path ) );
+            }
+            else
+            {
+                auto ArgSize       = PyBytes_GET_SIZE( PyArgBytes );
+                auto ObjArgs       = PyBytes_AS_STRING( PyArgBytes );
+                auto ArgsByteArray = QByteArray( ObjArgs, ArgSize );
+
+                Sessions.InteractedWidget->DemonCommands->Execute.InlineExecute( ( char* ) TaskID, ( char* ) EntryFunc, ( char* ) Path, ArgsByteArray, Flags );
+            }
+
             break;
         }
     }
@@ -277,7 +309,65 @@ PyObject* DemonClass_DllSpawn( PPyDemonClass self, PyObject *args )
     {
         if ( Sessions.Name.compare( self->DemonID ) == 0 )
         {
-            Sessions.InteractedWidget->DemonCommands->Execute.DllSpawn( TaskID, DllPath, ArgsByteArray );
+            if ( FileRead( DllPath ) == nullptr )
+            {
+                Sessions.InteractedWidget->AppendRaw();
+                Sessions.InteractedWidget->TaskError( "Failed to open dll path: " + QString( DllPath ) );
+            }
+            else
+            {
+                Sessions.InteractedWidget->DemonCommands->Execute.DllSpawn( TaskID, DllPath, ArgsByteArray );
+            }
+
+            break;
+        }
+    }
+
+    Py_RETURN_NONE;
+}
+
+
+// Demon.ProcessCreate( TaskID: str App: str, Cmdline: str, Suspended: bool, Piped: bool, Verbose: bool )
+PyObject* DemonClass_ProcessCreate( PPyDemonClass self, PyObject *args )
+{
+    PCHAR     TaskID    = nullptr;
+    PCHAR     App       = nullptr;
+    PCHAR     CmdLine   = nullptr;
+    PyObject* Suspended = nullptr;
+    PyObject* Piped     = nullptr;
+    PyObject* Verbose   = nullptr;
+    auto      ProcArg   = QString();
+
+    if ( ! PyArg_ParseTuple( args, "sssOOO", &TaskID, &App, &CmdLine, &Suspended, &Piped, &Verbose ) )
+        Py_RETURN_NONE;
+
+    if ( PyObject_IsTrue( Suspended ) )
+        ProcArg += "4";
+    else
+        ProcArg += "0";
+
+    if ( ! QString( App ).isEmpty() )
+        ProcArg += ";" + QString( App );
+    else
+        ProcArg += ";";
+
+    if ( PyObject_IsTrue( Verbose ) )
+        ProcArg += ";TRUE";
+    else
+        ProcArg += ";FALSE";
+
+    if ( PyObject_IsTrue( Piped ) )
+        ProcArg += ";TRUE";
+    else
+        ProcArg += ";FALSE";
+
+    ProcArg += ";" + QString( CmdLine ).toUtf8().toBase64();
+
+    for ( auto& Sessions : HavocX::Teamserver.Sessions )
+    {
+        if ( Sessions.Name.compare( self->DemonID ) == 0 )
+        {
+            Sessions.InteractedWidget->DemonCommands->Execute.ProcModule( TaskID, 4, ProcArg );
             break;
         }
     }
@@ -298,22 +388,21 @@ PyObject* DemonClass_ConsoleWrite( PPyDemonClass self, PyObject *args )
     {
         if ( d.Name.compare( self->DemonID ) == 0 )
         {
-
             if ( Type == self->CONSOLE_INFO )
             {
-                d.InteractedWidget->Console->append( Util::ColorText::Green( "[+]" ) + " " + QString( Message ) );
+                d.InteractedWidget->DemonCommands->BufferedMessages << Util::ColorText::Green( "[+]" ) + " " + QString( Message );
                 break;
             }
             else if ( Type == self->CONSOLE_ERROR )
             {
-                d.InteractedWidget->Console->append( Util::ColorText::Red( "[-]" ) + " " + QString( Message ) );
+                d.InteractedWidget->DemonCommands->BufferedMessages << Util::ColorText::Red( "[!]" ) + " " + QString( Message );
                 break;
             }
             else if ( Type == self->CONSOLE_TASK )
             {
-                QString TaskID = Util::gen_random( 8 ).c_str();
+                auto TaskID = QString( Util::gen_random( 8 ).c_str() );
 
-                d.InteractedWidget->Console->append( Util::ColorText::Cyan( "[*]" ) + " " + Util::ColorText::Comment( "[" + TaskID + "]") + " " + Util::ColorText::Cyan( QString( Message ).toHtmlEscaped() ) );
+                d.InteractedWidget->DemonCommands->CommandTaskInfo[ TaskID ] = Message;
 
                 return PyUnicode_FromString( TaskID.toStdString().c_str() );
             }

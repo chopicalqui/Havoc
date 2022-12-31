@@ -2,10 +2,13 @@
 #include <UserInterface/Widgets/DemonInteracted.h>
 #include <Util/ColorText.h>
 
+#include <QDate>
+#include <QTime>
 #include <QCompleter>
 #include <QKeyEvent>
 #include <QEvent>
 #include <QStringListModel>
+#include <QScrollBar>
 
 using namespace HavocNamespace::UserInterface::Widgets;
 using namespace HavocNamespace::Util;
@@ -15,6 +18,7 @@ DemonInteracted::DemonInput::DemonInput( QWidget* parent ) : QLineEdit( parent )
     CommandHistoryIndex = 0;
 }
 
+/* TODO: refactor this */
 bool DemonInteracted::DemonInput::event( QEvent *e )
 {
     if ( e->type() == e->KeyPress )
@@ -65,6 +69,11 @@ bool DemonInteracted::DemonInput::event( QEvent *e )
     }
 
     return QLineEdit::event( e );
+}
+
+void DemonInteracted::DemonInput::AddCommand( const QString &Command )
+{
+    CommandHistory << Command;
 }
 
 void DemonInteracted::setupUi( QWidget *Form )
@@ -196,6 +205,9 @@ void DemonInteracted::AppendText( const QString& text )
         }
     }
 
+    if ( AgentTypeName.isEmpty() )
+        AgentTypeName = "Demon";
+
     DemonCommands->Prompt = QString(
             ColorText::Comment( QDate::currentDate().toString( "dd/MM/yyyy" ) + " "+ QTime::currentTime().toString( "hh:mm:ss" ) +
             " [" + HavocX::Teamserver.User + "] " ) +
@@ -207,22 +219,43 @@ void DemonInteracted::AppendText( const QString& text )
         lineEdit->CommandHistory << text;
         lineEdit->CommandHistoryIndex = lineEdit->CommandHistory.size();
 
-        for ( auto& Command: HavocX::Teamserver.RegisteredCommands )
+        /* check if registered a command called help. if yes then exclude this. */
+        auto AgentData   = ServiceAgent();
+        auto HelpCommand = false;
+
+        if ( DemonCommands->MagicValue != DemonMagicValue )
         {
-            if ( text.split(" ")[ 0 ].compare( Command.Command.c_str() ) == 0  )
+            for ( auto& agent : HavocX::Teamserver.ServiceAgents )
+            {
+                if ( DemonCommands->MagicValue == agent.MagicValue )
+                {
+                    AgentData = agent;
+                    AgentTypeName = agent.Name;
+                }
+            }
+        }
+
+        for ( auto & command : AgentData.Commands )
+        {
+            if ( command.Name == "help" )
+            {
+                HelpCommand = true;
+                break;
+            }
+        }
+
+        if ( ! HelpCommand )
+        {
+            if ( text.split( " " )[ 0 ].compare( "help" ) == 0 )
             {
                 AppendRaw();
                 AppendRaw( DemonCommands->Prompt );
             }
         }
 
-        if ( text.split( " " )[ 0 ].compare( "help" ) == 0 )
-        {
-            AppendRaw();
-            AppendRaw( DemonCommands->Prompt );
-        }
-
         DemonCommands->DispatchCommand( true, "", text );
+
+        Console->verticalScrollBar()->setValue( Console->verticalScrollBar()->maximum() );
     }
 
     this->lineEdit->clear();
@@ -265,11 +298,11 @@ void DemonInteracted::AppendNoNL( const QString &text )
 
 void DemonInteracted::AutoCompleteAdd( QString text )
 {
-    auto model = ( QStringListModel* ) CommandCompleter->model();
+    /*auto model = ( QStringListModel* ) CommandCompleter->model();
 
     CompleterCommands << text;
     model->setStringList( CompleterCommands );
-    CommandCompleter->setModel( model );
+    CommandCompleter->setModel( model );*/
 }
 
 void DemonInteracted::AutoCompleteClear()

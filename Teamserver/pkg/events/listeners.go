@@ -27,15 +27,16 @@ func (listeners) ListenerAdd(FromUser string, Type int, Config any) packager.Pac
 		Package.Body.Info = make(map[string]interface{})
 		Package.Body.Info = structs.Map(Config.(*handlers.HTTP).Config)
 
-		Package.Body.Info["Protocol"] = handlers.DEMON_HTTP
+		Package.Body.Info["Protocol"] = handlers.AGENT_HTTP
 		Package.Body.Info["Headers"] = strings.Join(Config.(*handlers.HTTP).Config.Headers, ", ")
 		Package.Body.Info["Uris"] = strings.Join(Config.(*handlers.HTTP).Config.Uris, ", ")
 
-		// Proxy settings
+		/* proxy settings */
 		Package.Body.Info["Proxy Enabled"] = "false"
 		if Config.(*handlers.HTTP).Config.Proxy.Enabled {
 			Package.Body.Info["Proxy Enabled"] = "true"
 		}
+
 		Package.Body.Info["Proxy Type"] = Config.(*handlers.HTTP).Config.Proxy.Type
 		Package.Body.Info["Proxy Host"] = Config.(*handlers.HTTP).Config.Proxy.Host
 		Package.Body.Info["Proxy Port"] = Config.(*handlers.HTTP).Config.Proxy.Port
@@ -55,6 +56,17 @@ func (listeners) ListenerAdd(FromUser string, Type int, Config any) packager.Pac
 
 		delete(Package.Body.Info, "Proxy")
 		delete(Package.Body.Info, "Response")
+		delete(Package.Body.Info, "Hosts")
+
+		var Hosts string
+		for _, host := range Config.(*handlers.HTTP).Config.Hosts {
+			if len(Hosts) == 0 {
+				Hosts = host
+			} else {
+				Hosts += ", " + host
+			}
+		}
+		Package.Body.Info["Hosts"] = Hosts
 
 		break
 
@@ -63,7 +75,7 @@ func (listeners) ListenerAdd(FromUser string, Type int, Config any) packager.Pac
 		Package.Body.Info = make(map[string]interface{})
 		Package.Body.Info = structs.Map(Config.(*handlers.External).Config)
 
-		Package.Body.Info["Protocol"] = handlers.DEMON_EXTERNAL
+		Package.Body.Info["Protocol"] = handlers.AGENT_EXTERNAL
 		Package.Body.Info["Status"] = "Online"
 
 		break
@@ -73,7 +85,7 @@ func (listeners) ListenerAdd(FromUser string, Type int, Config any) packager.Pac
 		Package.Body.Info = make(map[string]interface{})
 		Package.Body.Info = structs.Map(Config.(*handlers.SMB).Config)
 
-		Package.Body.Info["Protocol"] = handlers.DEMON_PIVOT_SMB
+		Package.Body.Info["Protocol"] = handlers.AGENT_PIVOT_SMB
 		Package.Body.Info["Status"] = "Online"
 
 		break
@@ -96,7 +108,7 @@ func (listeners) ListenerEdit(Type int, Config any) packager.Package {
 		Package.Body.Info = make(map[string]interface{})
 		Package.Body.Info = structs.Map(Config.(*handlers.HTTPConfig))
 
-		Package.Body.Info["Protocol"] = handlers.DEMON_HTTP
+		Package.Body.Info["Protocol"] = handlers.AGENT_HTTP
 		Package.Body.Info["Headers"] = strings.Join(Config.(*handlers.HTTPConfig).Headers, ", ")
 		Package.Body.Info["Uris"] = strings.Join(Config.(*handlers.HTTPConfig).Uris, ", ")
 
@@ -116,8 +128,22 @@ func (listeners) ListenerEdit(Type int, Config any) packager.Package {
 			Package.Body.Info["Secure"] = "true"
 		}
 
+		/* response */
+		Package.Body.Info["Response Headers"] = strings.Join(Config.(*handlers.HTTPConfig).Response.Headers, ", ")
+
 		delete(Package.Body.Info, "Proxy")
 		delete(Package.Body.Info, "Response")
+		delete(Package.Body.Info, "Hosts")
+
+		var Hosts string
+		for _, host := range Config.(*handlers.HTTPConfig).Hosts {
+			if len(Hosts) == 0 {
+				Hosts = host
+			} else {
+				Hosts += ", " + host
+			}
+		}
+		Package.Body.Info["Hosts"] = Hosts
 
 		break
 	}

@@ -6,14 +6,15 @@
 
 #include <ntstatus.h>
 
+/* Move this to Token.c
+ * New name is going to be TokenDuplicate*/
 BOOL Win32_DuplicateTokenEx(
-        HANDLE                          ExistingTokenHandle,
-        DWORD                           dwDesiredAccess,
-        LPSECURITY_ATTRIBUTES           lpTokenAttributes,
-        SECURITY_IMPERSONATION_LEVEL    ImpersonationLevel,
-        TOKEN_TYPE                      TokenType,
-        PHANDLE                         DuplicateTokenHandle
-)
+        HANDLE                       ExistingTokenHandle,
+        DWORD                        dwDesiredAccess,
+        LPSECURITY_ATTRIBUTES        lpTokenAttributes,
+        SECURITY_IMPERSONATION_LEVEL ImpersonationLevel,
+        TOKEN_TYPE                   TokenType,
+        PHANDLE                      DuplicateTokenHandle )
 {
     OBJECT_ATTRIBUTES           ObjectAttributes    = { 0 };
     NTSTATUS                    Status              = STATUS_SUCCESS;
@@ -46,11 +47,10 @@ BOOL Win32_DuplicateTokenEx(
     }
 
     ObjectAttributes.SecurityQualityOfService = &Sqos;
-    Status = Instance->Syscall.NtDuplicateToken( ExistingTokenHandle, dwDesiredAccess, &ObjectAttributes, FALSE, TokenType, DuplicateTokenHandle );
 
-    if ( ! NT_SUCCESS( Status ) )
+    if ( ! NT_SUCCESS( Status = Instance.Syscall.NtDuplicateToken( ExistingTokenHandle, dwDesiredAccess, &ObjectAttributes, FALSE, TokenType, DuplicateTokenHandle ) ) )
     {
-        NtSetLastError( Instance->Win32.RtlNtStatusToDosError( Status ) );
+        NtSetLastError( Instance.Win32.RtlNtStatusToDosError( Status ) );
         return FALSE;
     }
 
